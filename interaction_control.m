@@ -17,7 +17,7 @@ psi_ext_data = zeros(size(time,2),6); %external wrench on EE (complinat_referenc
 %% Desired trajectory
 
 cdt = 0.01; %sampling time (10ms)
-[xd1, dxd1, ddxd1] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
+[xd1, dxd1, ddxd1,or_data] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
 
 %% Connect to VREP
 
@@ -111,7 +111,7 @@ if (clientID>-1)
         else
             xr = z0;
             or = or_in; 
-            e = [xd(1,:)' - xr; zeros(3,1)]; 
+            e = [xd1(1,:)' - xr; zeros(3,1)]; 
             de = zeros(6,1);
         end
 
@@ -119,10 +119,10 @@ if (clientID>-1)
         wrench_ext = ext_forces(x);
         w_ext_data(i,:) = wrench_ext;
  
-        psi_ext = R*wrench_ext(i,1:3); %external force compliant frame
-        psi_ext_data(i,:) = psi_ext; 
+        psi_ext = R*wrench_ext(1:3); %external force compliant frame
+        psi_ext_data(i,:) = [psi_ext;0;0;0];  
         
-        [xc,dxc,ddxc,or,e,de] = adm_control(xd(j,:)',dxd(j,:)',ddxd(j,:)',or_data(j,:)',e,de,or,[psi_ext,0,0,0]',Md1,Kd1,Bd1,time);
+        [xd,dxd,ddxd,or,e,de] = adm_control(xd1(j,:)',dxd1(j,:)',ddxd1(j,:)',or_data(j,:)',e,de,or,[psi_ext;0;0;0],Md1,Kd1,Bd1,time);
         
         xc_data(i,:) = xd; 
         dxc_data(i,:) = dxd;
@@ -133,6 +133,7 @@ if (clientID>-1)
 
         % Analytical Jacobian
         Jp = get_Ja(qm); 
+        Jpose = fep.pose_jacobian(qm); %DQ pose jacobian (for null-space controller)
         
         % Current joint derivative (Euler 1st order derivative)
         qm_dot = (qm-qmOld)/cdt; %computed as vrep function 
@@ -161,7 +162,7 @@ if (clientID>-1)
         % -----------------------
        
         disp(['it: ',num2str(i),' time(',num2str(i*cdt),') - error:',num2str(norm(xd_des-x))])
-        disp(['it: ',num2str(i),' time(',num2str(i*cdt),') - pos error:',num2str(norm(vec4(DQ(xd_des).translation-DQ(x).translation)))])
+      
         
         % Saving data to analyze later
         % -----------------------
@@ -187,13 +188,14 @@ if (clientID>-1)
          
 
          %% Define error (task-space)
-         e = xd_des - x;
-         de = dxd_des - dx;
-         ei = de*cdt + e;
-         y = pinv(Jp)*(ddxd_des - Jp_dot*qm_dot  + kp*eye(8)*e + kd*eye(8)*de + 0*ki*eye(8)*ei);
+         e = xd_des - x; %position error
+         de = dxd_des - dx(1:3,:); %linear velocity error
+         ei = de*cdt + e; %integral error
+         ddxd_des = [ddxdes;0;0;0]; %desired acceleration
+         y = pinv(Jp)*(ddxd_des - Jp_dot*qm_dot  + kp*eye(6)*e + kd*eye(6)*de + 0*ki*eye(6)*ei);
          tau = M*y + c + g; 
          
-         N = haminus8(DQ(xd_des))*DQ.C8*Jp;
+         N = haminus8(DQ(xd_des))*DQ.C8*Jpose;
          robustpseudoinverse = N'*pinv(N*N' + 0.1*eye(8));
          
          %%%%%%%% null space control %%%%%%%%%

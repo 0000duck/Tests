@@ -5,9 +5,11 @@ warning off;
 clc;
 
 %% Addpath 
-addpath /home/geriatronics/github/tests/functions_euler
-addpath /home/geriatronics/github/tests/matlab_original
-addpath /home/geriatronics/github/tests/others
+addpath /home/geriatronics/github/Tests/functions
+addpath /home/geriatronics/github/Tests/matlab_original
+addpath /home/geriatronics/github/Tests/others
+addpath /home/geriatronics/github/Tests/Vrep_utils
+
 
 
 disp('Loading parameters..')
