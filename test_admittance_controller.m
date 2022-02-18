@@ -6,7 +6,7 @@
 
 wrench_ext_data = zeros(size(time,2),6); 
 
-f_ext = [0;0;-10;0;0;0]; % to be expressed with respect to the compliant frame
+f_ext = [0;0;0;0;0;0]; % to be expressed with respect to the compliant frame
 
 %j = 1;
 %for j = 1:size(time,2)
@@ -65,13 +65,13 @@ grid on
 xlabel('time [s]')
 ylabel('x [m]')
 legend('des','comp')
-nexttile
 
+nexttile
+plot(time, xd(:,2), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+hold on 
 hold on 
 grid on
 plot(time, xc_data(:,2), 'Linewidth',1.5, 'Color', 'b','LineStyle','--')
-hold on
-grid on
 xlabel('time [s]')
 ylabel('y [m]')
 legend('des','comp')
@@ -89,7 +89,7 @@ legend('des','comp')
 
 
 figure;
-plot(time, xd(:,3) - xc_data(:,3), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+plot(time, xd(:,1) - xc_data(:,1), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
 xlabel('time [s]')
 ylabel('displacement [m]')
 
