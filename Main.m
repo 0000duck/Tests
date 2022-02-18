@@ -22,7 +22,6 @@ time = 0:cdt:2.5; %simulation time
 tt = time; 
 
 
-
 %% Initial conditions
 % q_in = [ 1.1515    0.3950    0.2619   -1.5722   -0.0002    1.3958    0.0001]'; %rad
 q_in = [0 0 0 -1.5708 0 1.5708 0]'; %rad
@@ -43,10 +42,11 @@ or_in = [phi teta psi]'; %initial orientation
 %% Interaction task with table
 I = eye(6); 
 Md1 = 1.5*I;  %desired mass matrix
-Kd1 = 300*I;  %desired stiffness matrix 
-% Kd1 = 1000*I; 
-Bd1 = sqrt(4*Kd1*Md1); 
-% Bd1 = 4*sqrt(4*Kd1*Md1);  %desired damping matrix
+% Kd1 = 300*I;  %desired stiffness matrix 
+% Bd1 = sqrt(4*Kd1*Md1);   %desired damping matrix
+Kd1 = 100*I;  %desired stiffness matrix 
+Bd1 = sqrt(4*Kd1*Md1);   %desired damping matrix
+
 %utils
 z_table = 0.35; % m
 k_table = 5000; %N/m
