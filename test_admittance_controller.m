@@ -6,7 +6,7 @@
 
 wrench_ext_data = zeros(size(time,2),6); 
 
-f_ext = [-100;0;0;0;0;0]; % to be expressed with respect to the compliant frame
+f_ext = [0;0;-10;0;0;0]; % to be expressed with respect to the compliant frame
 
 %j = 1;
 %for j = 1:size(time,2)
@@ -87,4 +87,8 @@ ylabel('z [m]')
 legend('des','comp')
 
 
+figure;
+plot(time, xd(:,3) - xc_data(:,3), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+xlabel('time [s]')
+ylabel('displacement [m]')
 

@@ -8,8 +8,7 @@ function wrench_ext = ext_forces(x)
 k_table = 5000; %N/m, environment stiffness
 pc = 0.35; %contact position (z axis)
 
-x_pos = vec4(DQ(x).translation); %EE position
-z = [x_pos(2); x_pos(3); x_pos(4)];
+z = [x(1); x(2); x(3)];
 
 if z(3) < pc
     F_ext = -k_table*(z(3) - pc); %elastic reaction
