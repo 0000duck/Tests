@@ -17,7 +17,7 @@ psi_ext_data = zeros(size(time,2),6); %external wrench on EE (complinat_referenc
 %% Desired trajectory
 
 cdt = 0.01; %sampling time (10ms)
-[xd1, dxd1, ddxd1,or_data] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
+[xd, dxd, ddxd,or_data] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
 
 %% Connect to VREP
 
@@ -97,23 +97,23 @@ if (clientID>-1)
         phi = atan2(R(2,1),R(1,1));
         teta = atan2(-R(3,1),sqrt(R(3,2)^2 + R(3,3)^2)); 
         psi = atan2(R(3,2),R(3,3));
-        r0 = [phi teta psi]'; 
+        r = [phi teta psi]'; %orientation
         
-        eul_angles = r0;
+        eul_angles = r;
 
     
         %% admittance loop
-        if i~=1
-            xr = xc_data(i-1,:)';
-            or = or_data(i-1,:)';
-            e = e_data(i-1,:)'; 
-            de = de_data(i-1,:)';
-        else
-            xr = z0;
-            or = or_in; 
-            e = [xd1(1,:)' - xr; zeros(3,1)]; 
-            de = zeros(6,1);
-        end
+%         if i~=1
+%             xr = xc_data(i-1,:)';
+%             or = or_data(i-1,:)';
+%             e = e_data(i-1,:)'; 
+%             de = de_data(i-1,:)';
+%         else
+%             xr = z0;
+%             or = or_in; 
+%             e = [xd1(1,:)' - xr; zeros(3,1)]; 
+%             de = zeros(6,1);
+%         end
 
         %% Model ext forces
         wrench_ext = ext_forces(x);
@@ -121,15 +121,16 @@ if (clientID>-1)
  
         psi_ext = R*wrench_ext(1:3); %external force compliant frame
         psi_ext_data(i,:) = [psi_ext;0;0;0];  
+        psi_ext = zeros(3,1); 
         
-        [xd,dxd,ddxd,or,e,de] = adm_control(xd1(j,:)',dxd1(j,:)',ddxd1(j,:)',or_data(j,:)',e,de,or,[psi_ext;0;0;0],Md1,Kd1,Bd1,time);
+%         [xd,dxd,ddxd,or,e,de] = adm_control(xd1(j,:)',dxd1(j,:)',ddxd1(j,:)',or_data(j,:)',e,de,or,[psi_ext;0;0;0],Md1,Kd1,Bd1,time);
         
-        xc_data(i,:) = xd; 
-        dxc_data(i,:) = dxd;
-        ddxc_data(i,:) = ddxd;
-        or_data(i,:) = or; 
-        e_data(i,:) = e; 
-        de_data(i,:) = de; 
+%         xc_data(i,:) = xd; 
+%         dxc_data(i,:) = dxd;
+%         ddxc_data(i,:) = ddxd;
+%         or_data(i,:) = or; 
+%         e_data(i,:) = e; 
+%         de_data(i,:) = de; 
 
         % Analytical Jacobian
         Jp = get_Ja(qm); 
@@ -146,14 +147,18 @@ if (clientID>-1)
         %---------------------------------------    
 
         % Compliant trajectory position,velocity acceleration
-        xd_des = xc_data(i,:)';
-        dxd_des = dxc_data(i,:)';
-        ddxd_des = ddxc_data(i,:)'; 
+%         xd_des = xc_data(i,:)';
+%         dxd_des = dxc_data(i,:)';
+%         ddxd_des = ddxc_data(i,:)'; 
+         xd_des = xd(i,:)';
+         dxd_des = dxd(i,:)';
+         ddxd_des = ddxd(i,:)'; 
+
         
         %Desired trajectory
-        xd1_str = xd1(i,:);
-        dx1_str = dxd1(i,:);
-        ddxd1_str = ddxd1(i,:);
+%         xd1_str = xd1(i,:);
+%         dx1_str = dxd1(i,:);
+%         ddxd1_str = ddxd1(i,:);
         
         %Ext force
         fext = w_ext_data(i,1:3)';
@@ -169,7 +174,7 @@ if (clientID>-1)
         
         sres.xd(:,i) = xd_des;  sres.xd_dot(:,i) = dxd_des;  sres.xd_ddot(:,i) = ddxd_des;
         sres.x(:,i) = x; 
-        sres.xref(:,i) = xd1_str;
+%         sres.xref(:,i) = xd1_str;
         sres.fext(:,i) = fext; 
         sres.eul(:,i) = eul_angles; 
       
@@ -189,10 +194,15 @@ if (clientID>-1)
 
          %% Define error (task-space)
          e = xd_des - x; %position error
+         or_e = or_data(i,:)' - or_in; 
+         err = [e;or_e];
          de = dxd_des - dx(1:3,:); %linear velocity error
-         ei = de*cdt + e; %integral error
-         ddxd_des = [ddxdes;0;0;0]; %desired acceleration
-         y = pinv(Jp)*(ddxd_des - Jp_dot*qm_dot  + kp*eye(6)*e + kd*eye(6)*de + 0*ki*eye(6)*ei);
+         de_or = Jp(4:6,1:7)*qm_dot;
+         derr = [de;de_or]; %fixed desired orientation
+         ddxd_des = [ddxd_des;0;0;0]; %desired acceleration
+
+         %task-space inverse dynamics + fb linearization
+         y = pinv(Jp)*(ddxd_des - Jp_dot*qm_dot  + kp*eye(6)*err + kd*eye(6)*derr);
          tau = M*y + c + g; 
          
          N = haminus8(DQ(xd_des))*DQ.C8*Jpose;
@@ -202,7 +212,7 @@ if (clientID>-1)
          P = eye(7) - pinv(N)*N;
          D_joints = eye(7)*2;
          tau_null = P*(-D_joints*qm_dot);
-         tau = tau + tau_null;
+         tau = tau + 0*tau_null;
          
          %Sent torque commands
          tau_send = tau;
@@ -241,66 +251,66 @@ end
 sim.delete(); % call the destructor!
 
 %% PLOTS if wanted
-
-figure(); 
-plot(tt,sres.tau_read(:,1),'m--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_send(1,:),'m','LineWidth',2);
-hold on, grid on
-plot(tt,sres.tau_send(2,:),'b--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_read(:,2),'b','LineWidth',2);
-hold on, grid on
-plot(tt,sres.tau_send(3,:),'g--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_read(:,3),'g','LineWidth',2);
-hold on, grid on
-plot(tt,sres.tau_send(4,:),'k--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_read(:,4),'k','LineWidth',2);
-hold on, grid on
-plot(tt,sres.tau_send(5,:),'r--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_read(:,5),'r','LineWidth',2);
-hold on, grid on
-plot(tt,sres.tau_send(6,:),'c--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_read(:,6),'c','LineWidth',2);
-hold on, grid on
-plot(tt,sres.tau_send(7,:),'y--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.tau_read(:,7),'y','LineWidth',2);
-legend('tsend','tread'); 
-
-%%Plot ee-position
-figure();
-plot(tt,sres.xd(1,:),'r--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.x(1,:),'c','LineWidth',2);
-hold on, grid on
-plot(tt,sres.xref(1,:),'b','LineWidth',2)
-legend('xc','x','xd')
-figure();
-plot(tt,sres.xd(2,:),'r--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.x(2,:),'c','LineWidth',2);
-hold on,grid on
-plot(tt,sres.xref(2,:),'b','LineWidth',2)
-legend('yc','y','yd')
-figure()
-plot(tt,sres.xd(3,:),'r--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.x(3,:),'c','LineWidth',2);
-hold on,grid on
-plot(tt,sres.xref(3,:),'b','LineWidth',2)
-legend('zc','z','zd')
-
-%%Plot euler angles 
-
-%%Plot ext force
-figure()
-plot(tt,sres.fext(1,:),'LineWidth',2);
-hold on, grid on
-plot(tt,sres.fext(2,:),'LineWidth',2);
-hold on,grid on
-plot(tt,sres.fext(3,:),'LineWidth',2);
+% 
+% figure(); 
+% plot(tt,sres.tau_read(:,1),'m--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_send(1,:),'m','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.tau_send(2,:),'b--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_read(:,2),'b','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.tau_send(3,:),'g--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_read(:,3),'g','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.tau_send(4,:),'k--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_read(:,4),'k','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.tau_send(5,:),'r--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_read(:,5),'r','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.tau_send(6,:),'c--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_read(:,6),'c','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.tau_send(7,:),'y--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.tau_read(:,7),'y','LineWidth',2);
+% legend('tsend','tread'); 
+% 
+% %%Plot ee-position
+% figure();
+% plot(tt,sres.xd(1,:),'r--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.x(1,:),'c','LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.xref(1,:),'b','LineWidth',2)
+% legend('xc','x','xd')
+% figure();
+% plot(tt,sres.xd(2,:),'r--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.x(2,:),'c','LineWidth',2);
+% hold on,grid on
+% plot(tt,sres.xref(2,:),'b','LineWidth',2)
+% legend('yc','y','yd')
+% figure()
+% plot(tt,sres.xd(3,:),'r--','LineWidth',3); 
+% hold on, grid on
+% plot(tt,sres.x(3,:),'c','LineWidth',2);
+% hold on,grid on
+% plot(tt,sres.xref(3,:),'b','LineWidth',2)
+% legend('zc','z','zd')
+% 
+% %%Plot euler angles 
+% 
+% %%Plot ext force
+% figure()
+% plot(tt,sres.fext(1,:),'LineWidth',2);
+% hold on, grid on
+% plot(tt,sres.fext(2,:),'LineWidth',2);
+% hold on,grid on
+% plot(tt,sres.fext(3,:),'LineWidth',2);

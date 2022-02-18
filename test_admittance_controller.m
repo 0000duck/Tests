@@ -66,7 +66,7 @@ xlabel('time [s]')
 ylabel('x [m]')
 legend('des','comp')
 nexttile
-plot(time, xd(:,2), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+
 hold on 
 grid on
 plot(time, xc_data(:,2), 'Linewidth',1.5, 'Color', 'b','LineStyle','--')
