@@ -44,6 +44,7 @@ for j = 1:size(time,2)
     dxc_data(j,:) = dxc;
     ddxc_data(j,:) = ddxc;
     or_data(j,:) = or; 
+    e_data(j,:) = e; 
     de_data(j,:) = de; 
 
     j = j+1;

@@ -4,11 +4,11 @@ include_namespace_dq;
 
 %% Initialize variables
 %%admittance controller
-xc_data = zeros(size(time,2),8);
-dxc_data = zeros(size(time,2),8);
-ddxc_data = zeros(size(time,2),8);
-yr_data = zeros(size(time,2),6);
-dyr_data =  zeros(size(time,2),6);
+xc_data = zeros(size(time,2),3);
+dxc_data = zeros(size(time,2),3);
+ddxc_data = zeros(size(time,2),3);
+e_data = zeros(size(time,2),6); %error
+de_data = zeros(size(time,2),6); %derror
 
 %%wrench vector
 w_ext_data = zeros(size(time,2),6); %external wrench on EE (world_frame)
@@ -17,7 +17,7 @@ psi_ext_data = zeros(size(time,2),6); %external wrench on EE (complinat_referenc
 %% Desired trajectory
 
 cdt = 0.01; %sampling time (10ms)
-[xd1, dxd1, ddxd1] = int_traj(x_in,time); %minimum jerk trajectory (desired)
+[xd1, dxd1, ddxd1] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
 
 %% Connect to VREP
 
@@ -67,7 +67,7 @@ if (clientID>-1)
     
     % Saving data to analyze later
     sres.xd = [];  sres.xd_dot = [];  sres.xd_ddot = [];
-    sres.x = []; sres.xref = []; sres.f_ext = []; 
+    sres.x = []; sres.xref = []; sres.f_ext = []; sres.eul = []; 
     %---------------------------------------    
     % time
     inittime = sim.simxGetLastCmdTime(clientID);
@@ -91,45 +91,48 @@ if (clientID>-1)
         qm = double([qmread])';
         
         % Current EE configuration
-        x = vec8(fep.fkm(qm)); 
-        r0 = vec4(DQ(x).P); 
+        [DH, Conv] = Load_Franka_DH();
+        [p,R] = DirectKinematic(DH,[qm;0],Conv);
+        x = p; % ee position
+        phi = atan2(R(2,1),R(1,1));
+        teta = atan2(-R(3,1),sqrt(R(3,2)^2 + R(3,3)^2)); 
+        psi = atan2(R(3,2),R(3,3));
+        r0 = [phi teta psi]'; 
+        
+        eul_angles = r0;
+
     
         %% admittance loop
         if i~=1
             xr = xc_data(i-1,:)';
-            yr_in = yr_data(i-1,:)';
-            dyr_in = dyr_data(i-1,:)';
+            or = or_data(i-1,:)';
+            e = e_data(i-1,:)'; 
+            de = de_data(i-1,:)';
         else
-            xr = vec8(x_in);
-            e_in = vec8(DQ(xr)'*DQ(xd1(1,:)));
-            yr_in = vec6(log(DQ(e_in)));
-            dyr_in = zeros(6,1);
+            xr = z0;
+            or = or_in; 
+            e = [xd(1,:)' - xr; zeros(3,1)]; 
+            de = zeros(6,1);
         end
 
         %% Model ext forces
         wrench_ext = ext_forces(x);
         w_ext_data(i,:) = wrench_ext;
-       
-        w_ext_data(i,:) = wrench_ext;
-        psi_ext = vec6(DQ(r0)'*DQ(wrench_ext)*DQ(r0)); %external wrench (compliant frame)
+ 
+        psi_ext = R*wrench_ext(i,1:3); %external force compliant frame
         psi_ext_data(i,:) = psi_ext; 
-        %psi_ext = [0;0;-5;0;0;0];
-         
-        [xd,dxd,ddxd,yr,dyr] = adm_contr_online(xd1(i,:),dxd1(i,:),ddxd1(i,:),psi_ext',xr,yr_in,dyr_in,Md1,Kd1,Bd1,time);
+        
+        [xc,dxc,ddxc,or,e,de] = adm_control(xd(j,:)',dxd(j,:)',ddxd(j,:)',or_data(j,:)',e,de,or,[psi_ext,0,0,0]',Md1,Kd1,Bd1,time);
         
         xc_data(i,:) = xd; 
         dxc_data(i,:) = dxd;
         ddxc_data(i,:) = ddxd;
-        yr_data(i,:) = yr; 
-        dyr_data(i,:) = dyr; 
+        or_data(i,:) = or; 
+        e_data(i,:) = e; 
+        de_data(i,:) = de; 
 
-
-        % Pose Jacobian
-        Jp = fep.pose_jacobian(qm);
-        
-        % Geometric Jacobian
-        J = geomJ(fep,qm);
-        Jg = [J(4:6,:);J(1:3,:)]; %[translation-rotation]
+        % Analytical Jacobian
+        Jp = get_Ja(qm); 
         
         % Current joint derivative (Euler 1st order derivative)
         qm_dot = (qm-qmOld)/cdt; %computed as vrep function 
@@ -138,7 +141,7 @@ if (clientID>-1)
         dx = Jp*qm_dot;
         
         % Pose Jacobian first-time derivative 
-        Jp_dot = fep.pose_jacobian_derivative(qm,qm_dot);
+        Jp_dot = get_Ja_dot(qm,qm_dot);
         %---------------------------------------    
 
         % Compliant trajectory position,velocity acceleration
@@ -163,10 +166,11 @@ if (clientID>-1)
         % Saving data to analyze later
         % -----------------------
         
-        sres.xd(:,i) = vec4(DQ(xd_des).translation);  sres.xd_dot(:,i) = dxd_des;  sres.xd_ddot(:,i) = ddxd_des;
-        sres.x(:,i) = vec4(DQ(x).translation); 
-        sres.xref(:,i) = vec4(DQ(xd1_str).translation);
+        sres.xd(:,i) = xd_des;  sres.xd_dot(:,i) = dxd_des;  sres.xd_ddot(:,i) = ddxd_des;
+        sres.x(:,i) = x; 
+        sres.xref(:,i) = xd1_str;
         sres.fext(:,i) = fext; 
+        sres.eul(:,i) = eul_angles; 
       
         % -----------------------        
         
@@ -268,26 +272,28 @@ legend('tsend','tread');
 
 %%Plot ee-position
 figure();
+plot(tt,sres.xd(1,:),'r--','LineWidth',3); 
+hold on, grid on
+plot(tt,sres.x(1,:),'c','LineWidth',2);
+hold on, grid on
+plot(tt,sres.xref(1,:),'b','LineWidth',2)
+legend('xc','x','xd')
+figure();
 plot(tt,sres.xd(2,:),'r--','LineWidth',3); 
 hold on, grid on
 plot(tt,sres.x(2,:),'c','LineWidth',2);
-hold on, grid on
+hold on,grid on
 plot(tt,sres.xref(2,:),'b','LineWidth',2)
-legend('xc','x','xd')
-figure();
+legend('yc','y','yd')
+figure()
 plot(tt,sres.xd(3,:),'r--','LineWidth',3); 
 hold on, grid on
 plot(tt,sres.x(3,:),'c','LineWidth',2);
 hold on,grid on
 plot(tt,sres.xref(3,:),'b','LineWidth',2)
-legend('yc','y','yd')
-figure()
-plot(tt,sres.xd(4,:),'r--','LineWidth',3); 
-hold on, grid on
-plot(tt,sres.x(4,:),'c','LineWidth',2);
-hold on,grid on
-plot(tt,sres.xref(4,:),'b','LineWidth',2)
 legend('zc','z','zd')
+
+%%Plot euler angles 
 
 %%Plot ext force
 figure()
