@@ -17,7 +17,7 @@ psi_ext_data = zeros(size(time,2),6); %external wrench on EE (complinat_referenc
 %% Desired trajectory
 
 cdt = 0.01; %sampling time (10ms)
-[xd, dxd, ddxd,or_data] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
+[xd1, dxd1,ddxd1,rot] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
 
 %% Connect to VREP
 
@@ -41,6 +41,8 @@ if (clientID>-1)
     handles = get_joint_handles(sim,clientID);
     joint_handles = handles.armJoints;
     fep  = fep_vreprobot.kinematics(); 
+    fep.set_reference_frame(pose_joint); %set base-frame to current pose of joint1
+
     
     for j=1:7
         [res,q(j)] = sim.simxGetJointPosition(clientID,joint_handles(j),sim.simx_opmode_buffer);
@@ -103,17 +105,17 @@ if (clientID>-1)
 
     
         %% admittance loop
-%         if i~=1
-%             xr = xc_data(i-1,:)';
-%             or = or_data(i-1,:)';
-%             e = e_data(i-1,:)'; 
-%             de = de_data(i-1,:)';
-%         else
-%             xr = z0;
-%             or = or_in; 
-%             e = [xd1(1,:)' - xr; zeros(3,1)]; 
-%             de = zeros(6,1);
-%         end
+        if i~=1
+            xr = xc_data(i-1,:)';
+            or = or_data(i-1,:)';
+            e = e_data(i-1,:)'; 
+            de = de_data(i-1,:)';
+        else
+            xr = z0;
+            or = or_in; 
+            e = [xd1(1,:)' - xr; zeros(3,1)]; 
+            de = zeros(6,1);
+        end
 
         %% Model ext forces
         wrench_ext = ext_forces(x);
@@ -121,16 +123,17 @@ if (clientID>-1)
  
         psi_ext = R*wrench_ext(1:3); %external force compliant frame
         psi_ext_data(i,:) = [psi_ext;0;0;0];  
-        psi_ext = zeros(3,1); 
+       
+        %% Compute compliant trajectory 
         
-%         [xd,dxd,ddxd,or,e,de] = adm_control(xd1(j,:)',dxd1(j,:)',ddxd1(j,:)',or_data(j,:)',e,de,or,[psi_ext;0;0;0],Md1,Kd1,Bd1,time);
+        [xd,dxd,ddxd,or,e,de] = adm_control(xd1(i,:)',dxd1(i,:)',ddxd1(i,:)',rot(i,:)',e,de,[psi_ext;0;0;0],Md1,Kd1,Bd1,time);
         
-%         xc_data(i,:) = xd; 
-%         dxc_data(i,:) = dxd;
-%         ddxc_data(i,:) = ddxd;
-%         or_data(i,:) = or; 
-%         e_data(i,:) = e; 
-%         de_data(i,:) = de; 
+        xc_data(i,:) = xd; 
+        dxc_data(i,:) = dxd;
+        ddxc_data(i,:) = ddxd;
+        or_data(i,:) = or; 
+        e_data(i,:) = e; 
+        de_data(i,:) = de; 
 
         % Analytical Jacobian
         Jp = get_Ja(qm); 
@@ -147,18 +150,15 @@ if (clientID>-1)
         %---------------------------------------    
 
         % Compliant trajectory position,velocity acceleration
-%         xd_des = xc_data(i,:)';
-%         dxd_des = dxc_data(i,:)';
-%         ddxd_des = ddxc_data(i,:)'; 
-         xd_des = xd(i,:)';
-         dxd_des = dxd(i,:)';
-         ddxd_des = ddxd(i,:)'; 
-
+        xd_des = xc_data(i,:)';
+        dxd_des = dxc_data(i,:)';
+        ddxd_des = ddxc_data(i,:)'; 
+    
         
         %Desired trajectory
-%         xd1_str = xd1(i,:);
-%         dx1_str = dxd1(i,:);
-%         ddxd1_str = ddxd1(i,:);
+        xd1_str = xd1(i,:);
+        dx1_str = dxd1(i,:);
+        ddxd1_str = ddxd1(i,:);
         
         %Ext force
         fext = w_ext_data(i,1:3)';

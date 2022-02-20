@@ -5,28 +5,28 @@ warning off;
 clc;
 
 %% Addpath 
-addpath /home/geriatronics/github/Tests/functions
-addpath /home/geriatronics/github/Tests/matlab_original
-addpath /home/geriatronics/github/Tests/others
-addpath /home/geriatronics/github/Tests/Vrep_utils
+%% Addpath 
 
+p1 = genpath('matlab_original');
+p2 = genpath('functions');
+p3 = genpath('Vrep_utils');
+addpath(p1,p2,p3); 
 
-
-disp('Loading parameters..')
+disp('Loading data..')
 
 %% Joint limits
 q_min = [-2.8973   -1.7628   -2.8973   -3.0718   -2.8973   -0.0175  -2.8973];
 q_max = [ 2.8973    1.7628    2.8973  -0.0698    2.8973    3.7525    2.8973];
 
 %% Constants
+C8 = DQ.C8; 
 cdt = 0.01; %sampling time
 time = 0:cdt:2.5; %simulation time
 tt = time; 
 
-
 %% Initial conditions
-% q_in = [ 1.1515    0.3950    0.2619   -1.5722   -0.0002    1.3958    0.0001]'; %rad
 q_in = [0 0 0 -1.5708 0 1.5708 0]'; %rad
+pose_joint = DQ(1) + 0.5*DQ.E*(DQ([0;0.0413;0;0])); %pose franka_joint1 (franka_int.ttt scene )
 
 %% Forward kinematics
 [DH, Conv] = Load_Franka_DH();
@@ -44,13 +44,11 @@ or_in = [phi teta psi]'; %initial orientation
 %% Interaction task with table
 I = eye(6); 
 Md1 = 1.5*I;  %desired mass matrix
-% Kd1 = 300*I;  %desired stiffness matrix 
-% Bd1 = sqrt(4*Kd1*Md1);   %desired damping matrix
 Kd1 = 300*I;  %desired stiffness matrix 
-Bd1 = sqrt(4*Kd1*Md1);   %desired damping matrix
+Bd1 = 4*sqrt(4*Kd1*Md1);   %desired damping matrix
 
 %utils
 z_table = 0.35; % m
 k_table = 5000; %N/m
 
-disp('Loaded')
+disp('Loading done!')

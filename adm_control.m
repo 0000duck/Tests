@@ -1,5 +1,6 @@
 %% Admittance controller
 %% Description: admittance controller to enforce an apparent impedance behaviour at task-space
+
 %%inputs: xd,dxd,ddxd = desired reference trajectory
 %         or_des = desired rotation
 %         f_ext = external wrench on EE (with respect to compliant reference frame)
@@ -8,7 +9,7 @@
 %%outpus: xc,dxc,ddxc = compliant trajectory to enforce desired impedance behaviour between the frames
 %         or_c = compliant orientation (fixed for now)
 
-function [xc,dxc,ddxc,or,e,de] = adm_control(xd,dxd,ddxd,or_des,e,de,or,wrench_ext,Md,Kd,Bd,time)
+function [xc,dxc,ddxc,or,e,de] = adm_control(xd,dxd,ddxd,or_des,e,de,wrench_ext,Md,Kd,Bd,time)
 
 cdt = time(2) - time(1); %sampling time 
 

@@ -1,11 +1,20 @@
 
-function [xd,dxd,ddxd,or_data] = gen_traj(x_in,r0,time)
-%% Description: generates minimum jerk task-space trajectory
+function [xd,dxd,ddxd,rot] = gen_traj(x_in,r0,time)
+
+%% Description: generates minimum jerk task-space trajectory for the end-effector
+%%Outputs: xd,dxd,ddxd = desired position,velocity,acceleration [3x1]
+%          or_data = desired orientation (ZYX euler angles)[3x1]
+
+%%Inputs: x_in = initial EE position [3x1]
+%         r0 = initial EE rotation [3x1]
+%         time = simulation time
+
+
 %%initialize
 xd = [zeros(size(time,2),3)];
 dxd = [zeros(size(time,2),3)];
 ddxd = [zeros(size(time,2),3)];
-or_data = [zeros(size(time,2),3)];
+rot = [zeros(size(time,2),3)];
 
 %%retrieve initial position
 
@@ -52,7 +61,7 @@ for i = 1:size(time,2)
     xd(i,:) = zd;
     dxd(i,:) = dzd;
     ddxd(i,:) = ddzd;
-    or_data(i,:) = r0;
+    rot(i,:) = r0;
     i = i+1;
 
 end
