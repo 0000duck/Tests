@@ -1,5 +1,8 @@
-%% Test simple interaction task
-%%Addpath 
+%% Dynamic control
+%% Description: simulation file of an admittance controller for a 7 dof Panda Robot tested on Vrep.
+%%Rotation is parametrized using euler angles (ZYX). 
+
+%% Addpath 
 include_namespace_dq;
 
 %% Initialize variables
@@ -11,14 +14,17 @@ e_data = zeros(size(time,2),6); %error
 de_data = zeros(size(time,2),6); %error
 or_data = zeros(size(time,2),3); 
 
-%%wrench vector
+%% Wrench vector
 w_ext_data = zeros(size(time,2),6); %external wrench on EE (world_frame)
 psi_ext_data = zeros(size(time,2),6); %external wrench on EE (complinat_reference_frame)
 
 %% Desired trajectory
-
-cdt = 0.01; %sampling time (10ms)
-[xd1, dxd1,ddxd1,rot] = int_traj(z0,or_in,time); %minimum jerk trajectory (desired)
+switch fuse
+    case 1
+        [xd1, dxd1,ddxd1,rot] = gen_traj(z0,or_in,time); %free motion
+    case 2
+        [xd1, dxd1,ddxd1,rot] = int_traj(z0,or_in,time); %interaction task
+end
 
 %% Connect to VREP
 
@@ -42,7 +48,6 @@ if (clientID>-1)
     handles = get_joint_handles(sim,clientID);
     joint_handles = handles.armJoints;
     fep  = fep_vreprobot.kinematics(); 
-    
     
     for j=1:7
         [res,q(j)] = sim.simxGetJointPosition(clientID,joint_handles(j),sim.simx_opmode_buffer);
@@ -102,9 +107,9 @@ if (clientID>-1)
         r = [phi teta psi]'; % current orientation
         
         eul_angles = r;
-        
     
-        %% admittance loop
+        %% Admittance loop
+
         if i~=1
             xr = xc_data(i-1,:)';
             e = e_data(i-1,:)'; 
@@ -115,16 +120,26 @@ if (clientID>-1)
             de = zeros(6,1);
         end
 
-        %% Model ext forces
-        wrench_ext = ext_forces(x);
-        w_ext_data(i,:) = wrench_ext;
- 
-        psi_ext = R*wrench_ext(1:3); %external force compliant frame
-        psi_ext_data(i,:) = [psi_ext;0;0;0];  
+        %% Model external wrench acting on EE 
+
+        switch fuse
+            case 1
+                % free-motion trajectory
+                w_ext_data(i,:) = zeros(6,1);
+                psi_ext1 = zeros(6,1); %external wrench (compliant frame)
+                psi_ext_data(i,:) = psi_ext1;
+            case 2
+                %interaction task 
+                wrench_ext = ext_forces(x);
+                w_ext_data(i,:) = wrench_ext; 
+                psi_ext = R*wrench_ext(1:3); %make external force with respect to compliant frame
+                psi_ext1 = [psi_ext;0;0;0]; 
+                psi_ext_data(i,:) = psi_ext1;
+        end
        
         %% Compute compliant trajectory 
         
-        [xd,dxd,ddxd,or,e,de] = adm_control(xd1(i,:)',dxd1(i,:)',ddxd1(i,:)',rot(i,:)',e,de,[psi_ext;0;0;0],Md1,Kd1,Bd1,time);
+        [xd,dxd,ddxd,or,e,de] = adm_control(xd1(i,:)',dxd1(i,:)',ddxd1(i,:)',rot(i,:)',e,de,psi_ext1,Md1,Kd1,Bd1,time);
         
         xc_data(i,:) = xd; 
         dxc_data(i,:) = dxd;
@@ -145,8 +160,7 @@ if (clientID>-1)
         
         % Pose Jacobian first-time derivative 
         Jp_dot = get_Ja_dot(qm,qm_dot);
-        Jpose_dot = fep.pose_jacobian_derivative(qm,qm_dot); 
-        
+       
         %---------------------------------------    
 
         % Compliant trajectory position,velocity acceleration
@@ -186,28 +200,34 @@ if (clientID>-1)
         M = get_MassMatrix(qm); 
         tauf = get_FrictionTorque(qm_dot);                
 
-    %%  Task-space inverse dynamics with fb linearization
-         kp = 100;
-         kd = 10;
-         ki = 0; %integral gain 
+       %% Motion controller
+       %%Gains
+         kp = 100*5;
+         kd = 10*5;
+         ki = 0; 
          
          %% Define error (task-space)
+       
          e = x - xd_des; %position error
          or_e = r - rot(i,:)'; %rotation error
-         err = [e;or_e];
-         de =  dx - dxd_des; %linear velocity error
-         de_or = Jp(4:6,1:7)*qm_dot;
-         derr = [de;de_or]; %fixed desired orientation
+         err = [e;or_e]; %combine position and rotation
+
+         de =  dx - dxd_des; %1-st time derivative position error
+         de_or = Jp(4:6,1:7)*qm_dot; %fixed desired orientation
+         derr = [de;de_or]; 
+
          a_des = [ddxd_des;0;0;0]; %desired acceleration
 
-         %task-space inverse dynamics + fb linearization
+         %% Task-space controller
          y = pinv(Jp)*(a_des - Jp_dot*qm_dot  - kp*eye(6)*err - kd*eye(6)*derr);
+
+         %%fb linearization
          tau = M*y + c + g; 
          
          N = haminus8(DQ(xd_des))*DQ.C8*Jpose;
          robustpseudoinverse = N'*pinv(N*N' + 0.1*eye(8));
          
-         %%%%%%%% null space control %%%%%%%%%
+         %%%%%%%% Null space control %%%%%%%%%
          q_des = (q_max + q_min)'/2; %joints center
          P = eye(7) - pinv(N)*N;
          D_joints = eye(7)*2;

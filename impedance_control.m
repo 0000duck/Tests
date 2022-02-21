@@ -1,8 +1,8 @@
-%% trial 
 
-%% Test simple interaction task
-%%Addpath 
-include_namespace_dq;
+%% Impedance control (with inertia shaping)
+%% Description: simulation file of an impedance controller for a 7 dof Panda Robot tested on Vrep.
+%%Rotation is parametrized using euler angles (ZYX). 
+
 
 %% Desired trajectory
 

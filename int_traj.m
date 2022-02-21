@@ -1,16 +1,22 @@
 %% Interaction task
 %% Desired trajectory
 function [xd,dxd,ddxd,or_data] = int_traj(x_in,r0,time)
-%% Description: generates minimum jerk task-space trajectory for interaction task
 
-%%initialize
+%% Description: generates minimum jerk task-space trajectory for interaction task with environment.
+%%Outputs: xd,dxd,ddxd = desired task-space trajectory; [3x1]
+%          or_data = desired orientation of end effector expressed with ZYX euler angles (fixed for now) [3x1]         [3x1]
+
+%%Inputs:  x_in = initial EE position; [3x1]
+%          r0 = initial EE rotation; [3x1]
+%          time = simulation time.
+
+%% Initialize variables
 xd = [zeros(size(time,2),3)];
 dxd = [zeros(size(time,2),3)];
 ddxd = [zeros(size(time,2),3)];
 or_data = [zeros(size(time,2),3)];
 
-
-%%retrive initial conditions
+%% Retrive initial conditions
 pos_i = [x_in(1);x_in(2);x_in(3)];
 i = 1;  
 
@@ -41,6 +47,7 @@ for i = 1:size(time,2)
     dzd = (pos_i - pos_f)*(60*(t^3)/(tf^4) - 30*(t^4)/(tf^5) -30*(t^2)/(tf^3));
     ddzd = (pos_i - pos_f)*(180*(t^2)/(tf^4) - 120*(t^3)/(tf^5) -60*(t)/(tf^3));
     
+    %Compute desired trajectory
     xd(i,:) = zd;
     dxd(i,:) = dzd;
     ddxd(i,:) = ddzd;
