@@ -7,7 +7,7 @@ include_namespace_dq;
 %% Desired trajectory
 
 cdt = 0.01; %sampling time (10ms)
-[xd,dxd,ddxd,rot,drot,ddrot] = gen_traj(z0,or_in,time); %minimum jerk trajectory (desired)
+[xd,dxd,ddxd,rot] = gen_traj(z0,or_in',time); %minimum jerk trajectory (desired)
 
 %% Connect to VREP
 
@@ -89,7 +89,7 @@ if (clientID>-1)
         teta = atan2(-R1(3,1),sqrt(R1(3,2)^2 + R1(3,3)^2)); 
         psi = atan2(R1(3,2),R1(3,3));
         r = [phi teta psi]'; % current orientation
-    
+
         % Analytical Jacobian
         Jp = get_Ja(qm); 
         Jpose = fep.pose_jacobian(qm); %DQ pose jacobian (for null-space controller)

@@ -103,9 +103,6 @@ if (clientID>-1)
         
         eul_angles = r;
         
-        %cfr
-        xdq = vec8(fep.fkm(qm)); %DQ pose
-        r0_dq = vec4(DQ(xdq).P);
     
         %% admittance loop
         if i~=1
@@ -144,14 +141,12 @@ if (clientID>-1)
         qm_dot = (qm-qmOld)/cdt; %computed as vrep function 
         
         %Current 1st-time derivative of EE pose
-        dx = Jp(1:3,:)*qm_dot;
-        dx_dq = Jpose*qm_dot; 
-        Psi = getPsi(DQ(xdq)); 
-        dx_dq = Psi*dx_dq; 
+        dx = Jp(1:3,1:7)*qm_dot; 
         
         % Pose Jacobian first-time derivative 
         Jp_dot = get_Ja_dot(qm,qm_dot);
         Jpose_dot = fep.pose_jacobian_derivative(qm,qm_dot); 
+        
         %---------------------------------------    
 
         % Compliant trajectory position,velocity acceleration
@@ -192,31 +187,32 @@ if (clientID>-1)
         tauf = get_FrictionTorque(qm_dot);                
 
     %%  Task-space inverse dynamics with fb linearization
-         kp = 1000*0.5;
-         kd = 100*0.5;
-         ki = 500; %integral gain 
+         kp = 100;
+         kd = 10;
+         ki = 0; %integral gain 
          
-
          %% Define error (task-space)
-         e = xd_des - x; %position error
-         or_e = or_data(i,:)' - r; %rotation error
+         e = x - xd_des; %position error
+         or_e = r - rot(i,:)'; %rotation error
          err = [e;or_e];
-         de = dxd_des - dx; %linear velocity error
-         de_or = -Jp(4:6,1:7)*qm_dot;
+         de =  dx - dxd_des; %linear velocity error
+         de_or = Jp(4:6,1:7)*qm_dot;
          derr = [de;de_or]; %fixed desired orientation
-         ddxd_des = [ddxd_des;0;0;0]; %desired acceleration
+         a_des = [ddxd_des;0;0;0]; %desired acceleration
 
          %task-space inverse dynamics + fb linearization
-         y = pinv(Jp)*(ddxd_des - Jp_dot*qm_dot  + kp*eye(6)*err + kd*eye(6)*derr);
+         y = pinv(Jp)*(a_des - Jp_dot*qm_dot  - kp*eye(6)*err - kd*eye(6)*derr);
          tau = M*y + c + g; 
          
          N = haminus8(DQ(xd_des))*DQ.C8*Jpose;
          robustpseudoinverse = N'*pinv(N*N' + 0.1*eye(8));
          
          %%%%%%%% null space control %%%%%%%%%
+         q_des = (q_max + q_min)'/2; %joints center
          P = eye(7) - pinv(N)*N;
          D_joints = eye(7)*2;
-         tau_null = P*(-D_joints*qm_dot);
+         K_joints = eye(7)*10;
+         tau_null = P*(-D_joints*qm_dot + 0*K_joints*(q_des - qm));
          tau = tau + tau_null;
          
          %Sent torque commands

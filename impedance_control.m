@@ -161,7 +161,8 @@ if (clientID>-1)
 
         a_des = [ddxd_des; zeros(3,1)];
         
-        F_ext = ext_forces(x);
+%       F_ext = ext_forces(x);
+        F_ext = [0;0;-10;0;0;0]; 
 
         sres.f_ext(:,i) = F_ext(1:3,:); 
 
