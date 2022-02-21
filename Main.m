@@ -26,7 +26,6 @@ tt = time;
 
 %% Initial conditions
 q_in = [0 0 0 -1.5708 0 1.5708 0]'; %rad
-pose_joint = DQ(1) + 0.5*DQ.E*(DQ([0;0.0413;0;0])); %pose franka_joint1 (franka_int.ttt scene )
 
 %% Forward kinematics
 [DH, Conv] = Load_Franka_DH();
@@ -38,8 +37,8 @@ dz0 = zeros(3,1); %inital linear velocity
 phi = atan2(R(2,1),R(1,1));
 teta = atan2(-R(3,1),sqrt(R(3,2)^2 + R(3,3)^2)); 
 psi = atan2(R(3,2),R(3,3));
-or_in = [phi teta psi]'; %initial orientation
 
+or_in = [phi teta psi]'; %initial orientation
 
 %% Interaction task with table
 I = eye(6); 

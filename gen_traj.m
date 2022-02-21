@@ -1,5 +1,5 @@
 
-function [xd,dxd,ddxd,rot] = gen_traj(x_in,r0,time)
+function [xd,dxd,ddxd,rot,drot,ddrot] = gen_traj(x_in,r0,time)
 
 %% Description: generates minimum jerk task-space trajectory for the end-effector
 %%Outputs: xd,dxd,ddxd = desired position,velocity,acceleration [3x1]
@@ -15,6 +15,8 @@ xd = [zeros(size(time,2),3)];
 dxd = [zeros(size(time,2),3)];
 ddxd = [zeros(size(time,2),3)];
 rot = [zeros(size(time,2),3)];
+drot = [zeros(size(time,2),3)];
+ddrot = [zeros(size(time,2),3)];
 
 %%retrieve initial position
 
@@ -62,6 +64,8 @@ for i = 1:size(time,2)
     dxd(i,:) = dzd;
     ddxd(i,:) = ddzd;
     rot(i,:) = r0;
+    drot(i,:) = zeros(3,1);
+    ddrot(i,:) = zeros(3,1);
     i = i+1;
 
 end

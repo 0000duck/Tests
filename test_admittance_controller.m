@@ -2,11 +2,11 @@
 
 %des trajectory
 % [xd,dxd,ddxd,or_data] = gen_traj(z0,or_in,time);
-[xd,dxd,ddxd,or_data] = int_traj(z0,or_in,time); 
+[xd,dxd,ddxd,rot] = int_traj(z0,or_in,time); 
 
 wrench_ext_data = zeros(size(time,2),6); 
 
-f_ext = [0;0;0;0;0;0]; % to be expressed with respect to the compliant frame
+f_ext = [0;0;-10;0;0;0]; % to be expressed with respect to the compliant frame
 
 %j = 1;
 %for j = 1:size(time,2)
@@ -38,7 +38,7 @@ for j = 1:size(time,2)
     end
 
     %compliant traj
-    [xc,dxc,ddxc,or,e,de] = adm_control(xd(j,:)',dxd(j,:)',ddxd(j,:)',or_data(j,:)',e,de,or,f_ext,Md1,Kd1,Bd1,time); 
+    [xc,dxc,ddxc,or,e,de] = adm_control(xd(j,:)',dxd(j,:)',ddxd(j,:)',rot(j,:)',e,de,f_ext,Md1,Kd1,Bd1,time); 
 
     xc_data(j,:) = xc; 
     dxc_data(j,:) = dxc;
@@ -87,9 +87,40 @@ xlabel('time [s]')
 ylabel('z [m]')
 legend('des','comp')
 
-
 figure;
 plot(time, xd(:,1) - xc_data(:,1), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
 xlabel('time [s]')
 ylabel('displacement [m]')
 
+nexttile
+plot(time, rot(:,1), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+hold on 
+grid on
+plot(time, or_data(:,1), 'Linewidth',1.5, 'Color', 'b','LineStyle','--')
+hold on
+grid on
+xlabel('time [s]')
+ylabel('phi [rad]')
+legend('des','comp')
+
+nexttile
+plot(time, rot(:,2), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+hold on 
+grid on
+plot(time, or_data(:,2), 'Linewidth',1.5, 'Color', 'b','LineStyle','--')
+hold on
+grid on
+xlabel('time [s]')
+ylabel('phi [rad]')
+legend('des','comp')
+
+nexttile
+plot(time, rot(:,3), 'Linewidth',2, 'Color', '[0.9290, 0.6940, 0.1250]')
+hold on 
+grid on
+plot(time, or_data(:,3), 'Linewidth',1.5, 'Color', 'b','LineStyle','--')
+hold on
+grid on
+xlabel('time [s]')
+ylabel('phi [rad]')
+legend('des','comp')
